@@ -1,13 +1,14 @@
-# PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
-# RSI + MACD Momentum Bot  (Long & Short, 1-min / 30-min)
-# PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
-#
 # STRATEGY SUMMARY
 # This is a strategy taken from Alapca's example but modified to be intraday. However,
-# it is very conservation. Long trades are made only during an up-trend and short trades
+# it is very conservation. 
+# 
+# Trading Mechanics
+# Long trades are made only during an up-trend and short trades
 # are made during a down-trend. This way you don't end up taking a long position a.k.a 
 # catching a knife due to RSI bounce from oversold during a down-trend a.k.a dead cat bounce. 
 #
+# Trading Intuition
+# 
 # ###########################Rules################################################
 # Timeframes:
 #   MAIN  (1-min)  : RSI + MACD signals are computed here.
@@ -62,7 +63,7 @@
 # PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
 
 import logging, logging.config, configparser, time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import pandas as pd
 
 # Config 
@@ -71,7 +72,7 @@ config = configparser.ConfigParser()
 config.read("resources/config.ini")
 
 # Utilities
-from src.utilities.market_data import fetch_bars, get_underlying_price
+from src.utilities.market_data import fetch_bars, update_bars, get_underlying_price
 from src.utilities.technicals import compute_rsi, compute_macd
 from src.utilities.account import calculate_buying_power_limit
 from src.utilities.misc import sleep_until
@@ -111,11 +112,11 @@ BUY_POWER_LIMIT = 0.02  # Max fraction of buying power per trade
 
 # Signal confluence window (in bars on the MAIN 1-min timeframe)
 WINDOW_SIZE     = 5     # RSI and MACD signals must be d 5 bars apart to confirm
-SIGNAL_EXPIRY   = 20    # A signal older than 20 bars is considered stale and ignored
+SIGNAL_EXPIRY   = 15    # A signal older than 15 bars is considered stale and ignored
 
 # Timeframes
 TIMEFRAME_MAIN  = TimeFrame(amount=1,  unit=TimeFrameUnit.Minute)
-TIMEFRAME_TREND = TimeFrame(amount=24, unit=TimeFrameUnit.Minute)
+TIMEFRAME_TREND = TimeFrame(amount=30, unit=TimeFrameUnit.Minute)
 
 # PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
 # SIGNAL STATE  (global, reset on startup)
@@ -180,7 +181,6 @@ def reset_short_exit_signals():
     global rsi_dip_bar, macd_cover_cross_bar, macd_center_up_bar
     rsi_dip_bar = macd_cover_cross_bar = macd_center_up_bar = None
 
-
 # PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
 # MAIN LOOP
 # PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
@@ -206,7 +206,6 @@ def main():
 
     logger.info(f"Starting algorithmic {ticker} trader")
 
-    screen_tik_tok = datetime.now()
     trade_tik_tok  = datetime.now()
     in_trade = "==NOT IN TRADE=="
 
@@ -215,6 +214,11 @@ def main():
     ma_fast = ma_mid = ma_slow = pd.Series([0.0])
     current_price = 0.0
 
+    # Download history to warm up the technicals
+    df_main  = fetch_bars(stock_data_client, ticker, TIMEFRAME_MAIN,  amount = MA_SLOW + 10)
+    df_trend = fetch_bars(stock_data_client, ticker, TIMEFRAME_TREND, amount = round(30*MA_SLOW*2.5))
+
+    logger.info("Fetched %d main bars and %d trend bars", len(df_main), len(df_trend))
     # Loop
     while True:
 
@@ -252,10 +256,20 @@ def main():
         if datetime.now() - trade_tik_tok < timedelta(minutes=1):
             continue  # Nothing to do yet; tight loop burns CPU add a micro-sleep if desired
 
-        # Fetch bars
-        df_main  = fetch_bars(stock_data_client, ticker, TIMEFRAME_MAIN,  amount = MA_SLOW + 10)
-        df_trend = fetch_bars(stock_data_client, ticker, TIMEFRAME_TREND, amount = round(30*MA_SLOW*2.5))
-        logger.info("Fetched %d main bars and %d trend bars", len(df_main), len(df_trend))
+        #Update bars
+        df_main_update  = update_bars(stock_data_client, ticker, TIMEFRAME_MAIN,  start_date_time = df_main['timestamp'].iloc[-1])
+        logger.info(f"It's been a minute {datetime.now() - trade_tik_tok}")
+        
+        if df_main_update.shape[0] > 1:
+            # Leave the far end history behind to achive a rolling window 
+            # and also leave first row of the updated bars otherwise because it starts with the last row of the previous data frame
+            df_main = pd.concat([df_main.loc[1:], df_main_update.loc[1: ]], ignore_index = True)
+
+        df_trend_update = update_bars(stock_data_client, ticker, TIMEFRAME_TREND, start_date_time = df_trend['timestamp'].iloc[-1])
+        if df_trend_update.shape[0] > 1:
+            # Leave the far end history behind to achive a rolling window 
+            # and also leave first row of the updated bars otherwise because it starts with the last row of the previous data frame
+            df_trend = pd.concat([df_trend.loc[1:], df_trend_update.loc[1: ]], ignore_index = True)
 
         if len(df_main) < MACD_SLOW + RSI_PERIOD:
             logger.warning("Not enough main bars to compute indicators. Skipping.")
