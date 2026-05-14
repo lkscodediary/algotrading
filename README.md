@@ -1,10 +1,13 @@
 # Algorithmic Trading
-
-This is a strategy taken from Alapca's [example](https://github.com/alpacahq/alpaca-py/blob/master/examples/stocks/build_trading_bot_with_ChatGPT/strategy.py) but modified to be intraday. However,
-it is very conservation. Long trades are made only during an up-trend and short trades
-are made during a down-trend. This way you don't end up taking a long position a.k.a 
-catching a knife due to RSI bounce from oversold during a down-trend a.k.a dead cat bounce. 
-
+This is a strategy taken from Alapca's [example](https://github.com/alpacahq/alpaca-py/blob/master/examples/stocks/build_trading_bot_with_ChatGPT/strategy.py) but modified to be intraday. However,it is very conservation. 
+_
+## TRADING INTUITION
+ - you're buying a dip within an uptrend.
+ - you're selling a dead cat bounce on downtrend.
+_
+## TRADING MECHANICS
+Long trades are made only during an up-trend and short trades are made during a down-trend. This way you don't end up taking a long position a.k.a catching a knife during a downtrend or go short during a up trend
+_
 ## Rules
 - Timeframes:
    - MAIN  (1-min)  : RSI + MACD signals are computed here.
