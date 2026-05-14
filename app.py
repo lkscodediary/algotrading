@@ -1,15 +1,17 @@
-# STRATEGY SUMMARY
+# STRATEGY SUMMARY                                                                                                                                                                             
 # This is a strategy taken from Alapca's example but modified to be intraday. However,
 # it is very conservation. 
-# 
-# Trading Mechanics
+#---------------------------------------------------------------------------------------
+# TRADING INTUITION
+# — you're buying a dip within an uptrend.
+# — you're selling a dead cat bounce on downtrend.
+#---------------------------------------------------------------------------------------
+# TRADING MECHANICS
 # Long trades are made only during an up-trend and short trades
 # are made during a down-trend. This way you don't end up taking a long position a.k.a 
-# catching a knife due to RSI bounce from oversold during a down-trend a.k.a dead cat bounce. 
-#
-# Trading Intuition
-# 
-# ###########################Rules################################################
+# catching a knife during a downtrend or go short during a up trend.
+#---------------------------------------------------------------------------------------
+# RULES
 # Timeframes:
 #   MAIN  (1-min)  : RSI + MACD signals are computed here.
 #   TREND (30-min) : Three moving averages define whether we're in an up- or
@@ -60,7 +62,7 @@
 # RSI thresholds (30/70): Kept. 1-min RSI does cross these levels on volatile
 #               stocks; you may tighten to 35/65 if signals are too rare.
 #
-# PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
+# ----------------------------------------------------------------------------------------------
 
 import logging, logging.config, configparser, time
 from datetime import datetime, timedelta
